@@ -1,7 +1,7 @@
 /* Deep Dive — React App
    Globals expected: CATS, SUBS (data.js), startParticles (particles.js) */
 
-const { useState, useEffect, useRef, useCallback } = React;
+const { useState, useEffect, useRef } = React;
 
 /* ── Utils ── */
 function encSession(name, catId, path) {
@@ -35,13 +35,6 @@ const TX2_COLORS = ['rgba(237,232,222,0.5)','rgba(237,232,222,0.5)','rgba(240,23
 const TX3_COLORS = ['rgba(237,232,222,0.24)','rgba(237,232,222,0.24)','rgba(240,230,208,0.24)','rgba(240,230,208,0.24)','rgba(255,255,255,0.24)'];
 const AC_COLORS  = ['#b8924e','#b8924e','#c9902a','#c9902a','#c4622a'];
 const ACD_COLORS = ['rgba(184,146,78,0.12)','rgba(184,146,78,0.12)','rgba(201,144,42,0.12)','rgba(201,144,42,0.12)','rgba(196,98,42,0.12)'];
-const BG_BLOOM = [
-  'radial-gradient(ellipse 80% 60% at 85% 15%, #1a1f3a 0%, transparent 70%)',
-  'radial-gradient(ellipse 70% 55% at 20% 45%, #1a1428 0%, transparent 70%)',
-  'radial-gradient(ellipse 65% 65% at 80% 80%, #2a1a08 0%, transparent 70%)',
-  'radial-gradient(ellipse 60% 60% at 50% 85%, #2a0a10 0%, transparent 70%)',
-  'radial-gradient(ellipse 50% 50% at 50% 50%, #1a0f04 0%, transparent 70%)',
-];
 
 /* ── App ── */
 function App() {
@@ -49,9 +42,11 @@ function App() {
   const [cat, setCat]       = useState(null);
   const [path, setPath]     = useState([]);
   const [name, setName]     = useState('');
-  const [black, setBlack]   = useState(false);
   const [replyText, setReplyText] = useState('');
   const pRef = useRef(null);
+
+  const dep = path.length;
+  const node = cat ? getNode(cat, path) : null;
 
   useEffect(() => {
     const loader = document.getElementById('loader');
@@ -92,37 +87,25 @@ function App() {
     r.setProperty('--acd', ACD_COLORS[d]);
   }, [dep]);
 
-  const fade = useCallback((fn, fast) => {
-    setBlack(true);
-    setTimeout(() => { fn(); setTimeout(() => setBlack(false), fast ? 100 : 180); }, fast ? 150 : 460);
-  }, []);
-
-  const startCat = c => { setCat(c); setPath([]); fade(() => setScreen('question')); };
+  const startCat = c => { setCat(c); setPath([]); setScreen('question'); };
   const chooseBranch = idx => {
     const np = [...path, idx];
     const node = getNode(cat, np);
-    fade(() => {
-      setPath(np);
-      if (!node.br || !node.br.length) { setScreen('silence'); }
-    });
+    setPath(np);
+    if (!node.br || !node.br.length) { setScreen('silence'); }
   };
-  const goHome = () => fade(() => { setCat(null); setPath([]); setScreen('splash'); window.history.replaceState(null, '', window.location.pathname); }, true);
-  const startSameCat = () => { setPath([]); fade(() => setScreen('question')); };
-  const goToCategories = () => fade(() => setScreen('categories'));
-  const goBack = () => { if (path.length > 0) fade(() => setPath(path.slice(0, -1))); };
-
-  const dep = path.length;
-  const node = cat ? getNode(cat, path) : null;
+  const goHome = () => { setCat(null); setPath([]); setScreen('splash'); window.history.replaceState(null, '', window.location.pathname); };
+  const startSameCat = () => { setPath([]); setScreen('question'); };
+  const goToCategories = () => setScreen('categories');
+  const goBack = () => { if (path.length > 0) setPath(path.slice(0, -1)); };
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1 }}>
-      <div style={{ position: 'fixed', inset: 0, zIndex: 0, background: BG_BLOOM[Math.min(dep, 4)], pointerEvents: 'none' }} />
-      {black && <div style={{ position: 'fixed', inset: 0, background: '#000', zIndex: 200, pointerEvents: 'none' }} />}
       {screen === 'splash'     && <Splash    onStart={() => setScreen('categories')} />}
       {screen === 'categories' && <CardGrid  onSelect={startCat} onBack={goHome} />}
-      {screen === 'question'   && cat && <Question key={path.join(',')} cat={cat} node={node} depth={dep} path={path} onChoose={chooseBranch} onHome={goHome} onBack={goBack} />}
-      {screen === 'silence'    && cat && <Silence  cat={cat} path={path} onDone={() => fade(() => setScreen('send'))} />}
-      {screen === 'send'       && cat && <Send     cat={cat} path={path} name={name} onNameChange={setName} onDone={() => fade(() => setScreen('final'))} onHome={goHome} />}
+      {screen === 'question'   && cat && <Question cat={cat} node={node} depth={dep} path={path} onChoose={chooseBranch} onHome={goHome} onBack={goBack} />}
+      {screen === 'silence'    && cat && <Silence  cat={cat} path={path} onDone={() => setScreen('send')} />}
+      {screen === 'send'       && cat && <Send     cat={cat} path={path} name={name} onNameChange={setName} onDone={() => setScreen('final')} onHome={goHome} />}
       {screen === 'final'      && cat && <Final    cat={cat} path={path} name={name} onHome={goHome} />}
       {screen === 'review'     && cat && <Review    cat={cat} path={path} senderName={name} onStartSame={startSameCat} onCategories={goToCategories} />}
       {screen === 'reply'      && cat && <ReplyView cat={cat} path={path} senderName={name} replyText={replyText} onHome={goHome} />}
@@ -157,7 +140,7 @@ function Splash({ onStart }) {
   }, []);
 
   return (
-    <div className="lay" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: 'max(72px,11vh) 28px max(64px,10vh)' }}>
+    <div className="lay" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: 'max(72px,11vh) 28px max(64px,10vh)', animation: 'fi .32s ease both' }}>
       <div>
         <div style={{ width: 28, height: 2, background: 'var(--ac)', marginBottom: 32, animation: 'fi .6s ease .1s both' }} />
         <h1 style={{ fontFamily: "'Playfair Display',serif", fontSize: 'clamp(48px,13vw,72px)', fontWeight: 400, lineHeight: 1.05, color: 'var(--tx)', letterSpacing: '-.02em', minHeight: '2.2em' }}>
@@ -188,18 +171,16 @@ function Splash({ onStart }) {
 /* ── Category Grid ── */
 function CardGrid({ onSelect, onBack }) {
   return (
-    <div className="lay" style={{ padding: 'max(56px,8vh) 16px max(32px,5vh)' }}>
+    <div className="lay" style={{ padding: 'max(56px,8vh) 16px max(32px,5vh)', animation: 'fi .32s ease both' }}>
       <button onClick={onBack} style={{ position: 'fixed', top: 20, left: 20, zIndex: 10, background: 'none', border: 'none', color: 'var(--tx3)', fontSize: 20, cursor: 'pointer', padding: '8px' }}>←</button>
       <div style={{ fontSize: 10, color: 'var(--tx3)', letterSpacing: '.12em', marginBottom: 22, paddingLeft: 4 }}>CHOOSE A THEME</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         {CATS.map((c, i) => (
-          <button key={c.id} onClick={() => onSelect(c)}
+          <button key={c.id} onClick={() => onSelect(c)} className="card-btn"
             style={{ background: 'var(--bg2)', border: '0.5px solid var(--bo)', borderRadius: 16,
               padding: '20px 16px', textAlign: 'left', cursor: 'pointer', minHeight: 80,
               animation: `up .35s ease ${i * 40}ms both`,
-              touchAction: 'manipulation' }}
-            onTouchStart={e => { e.currentTarget.style.transform = 'scale(0.97)'; e.currentTarget.style.borderColor = c.col; }}
-            onTouchEnd={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.borderColor = 'var(--bo)'; }}>
+              touchAction: 'manipulation' }}>
             <div style={{ width: 10, height: 10, borderRadius: '50%', background: c.col, marginBottom: 10 }} />
             <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 15, color: 'var(--tx)', fontWeight: 400, marginBottom: 4 }}>{c.name}</div>
             <div style={{ fontSize: 11, color: 'var(--tx3)', fontStyle: 'italic', lineHeight: 1.4 }}>{c.sub}</div>
@@ -238,7 +219,7 @@ function Question({ cat, node, depth, path, onChoose, onHome, onBack }) {
   const hist = getHist(cat, path);
 
   return (
-    <div className="lay" style={{ display: 'flex', flexDirection: 'column', padding: 'max(48px,7vh) 22px 32px', minHeight: '100%', position: 'relative' }}>
+    <div className="lay" style={{ display: 'flex', flexDirection: 'column', padding: 'max(48px,7vh) 22px 32px', minHeight: '100%', position: 'relative', animation: 'fi .32s ease both' }}>
       {scan && <div className="scanbar" />}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'max(28px,4vh)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -270,12 +251,10 @@ function Question({ cat, node, depth, path, onChoose, onHome, onBack }) {
           {disp}{disp !== node.q && <span style={{ opacity: .32 }}>▋</span>}
         </p>
         {showBr && node.br && node.br.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, animation: 'fi .28s ease both' }}>
             {node.br.map((b, i) => (
-              <button key={i} onClick={() => pick(i)} className="up"
-                style={{ background: 'var(--bg2)', border: `0.5px solid ${chosen === i ? cat.col : 'var(--bo)'}`, borderRadius: 14, padding: '18px 20px', textAlign: 'left', color: chosen !== null && chosen !== i ? 'var(--tx3)' : 'var(--tx)', fontSize: 14, lineHeight: 1.7, minHeight: 56, cursor: chosen !== null ? 'default' : 'pointer', opacity: chosen !== null && chosen !== i ? 0 : 1, transform: chosen !== null && chosen !== i ? 'translateY(4px)' : 'none', transition: `opacity .4s ease ${i * .07}s,transform .4s ease ${i * .07}s,border-color .15s`, animationDelay: `${i * .06}s` }}
-                onTouchStart={e => { if (chosen === null) e.currentTarget.style.background = 'var(--bg3)'; }}
-                onTouchEnd={e => { e.currentTarget.style.background = 'var(--bg2)'; }}>
+              <button key={i} onClick={() => pick(i)} className="branch-btn"
+                style={{ background: 'var(--bg2)', border: `0.5px solid ${chosen === i ? cat.col : 'var(--bo)'}`, borderRadius: 14, padding: '18px 20px', textAlign: 'left', color: chosen !== null && chosen !== i ? 'var(--tx3)' : 'var(--tx)', fontSize: 14, lineHeight: 1.7, minHeight: 56, cursor: chosen !== null ? 'default' : 'pointer', opacity: chosen !== null && chosen !== i ? 0 : 1, transform: chosen !== null && chosen !== i ? 'translateY(4px)' : 'none', transition: `opacity .4s ease ${i * .07}s,transform .4s ease ${i * .07}s,border-color .15s` }}>
                 {b.label}
               </button>
             ))}
@@ -318,7 +297,7 @@ function Silence({ cat, path, onDone }) {
   }, []);
 
   return (
-    <div className="lay" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 28px', background: '#000', textAlign: 'center', position: 'relative' }}>
+    <div className="lay" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 28px', background: '#000', textAlign: 'center', position: 'relative', animation: 'fi .32s ease both' }}>
       <div style={{ width: 1, height: 52, background: `${cat.col}33`, marginBottom: 44 }} />
       <p style={{ fontFamily: "'Playfair Display',serif", fontStyle: 'italic', fontSize: 'clamp(19px,5.2vw,27px)', lineHeight: 1.85, color: 'var(--tx)', maxWidth: 340, marginBottom: 52, minHeight: '5em' }}>
         {disp}
@@ -342,7 +321,7 @@ function Send({ cat, path, name, onNameChange, onDone, onHome }) {
   const [note, setNote] = useState('');
 
   return (
-    <div className="lay" style={{ padding: 'max(52px,8vh) 22px max(52px,8vh)' }}>
+    <div className="lay" style={{ padding: 'max(52px,8vh) 22px max(52px,8vh)', animation: 'fi .32s ease both' }}>
       <div style={{ animation: 'up .4s ease both', marginBottom: 24 }}>
         <div style={{ width: 22, height: 2, background: cat.col, marginBottom: 18 }} />
         <h2 style={{ fontFamily: "'Playfair Display',serif", fontSize: 22, fontWeight: 400, color: 'var(--tx)', marginBottom: 6 }}>You went deep.</h2>
@@ -410,7 +389,7 @@ function Final({ cat, path, name, onHome }) {
   };
 
   return (
-    <div className="lay" style={{ padding: 'max(52px,8vh) 22px max(52px,8vh)' }}>
+    <div className="lay" style={{ padding: 'max(52px,8vh) 22px max(52px,8vh)', animation: 'fi .32s ease both' }}>
       <div style={{ animation: 'up .4s ease both', marginBottom: 22 }}>
         <div style={{ width: 22, height: 2, background: cat.col, marginBottom: 16 }} />
         <h2 style={{ fontFamily: "'Playfair Display',serif", fontSize: 24, fontWeight: 400, color: 'var(--tx)', marginBottom: 6 }}>Ready to send.</h2>
@@ -432,10 +411,8 @@ function Final({ cat, path, name, onHome }) {
           { t: 'link', l: 'Copy link', s: 'They open it and see your path + the question' },
           { t: 'text', l: 'Copy as text', s: 'One question + context — paste anywhere' }
         ].map(({ t, l, s }) => (
-          <button key={t} onClick={() => copyIt(t)}
-            style={{ background: 'var(--bg2)', border: '0.5px solid var(--bo)', borderRadius: 14, padding: '13px 15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', transition: 'border-color .15s' }}
-            onTouchStart={e => e.currentTarget.style.borderColor = 'var(--boh)'}
-            onTouchEnd={e => e.currentTarget.style.borderColor = 'var(--bo)'}>
+          <button key={t} onClick={() => copyIt(t)} className="copy-btn"
+            style={{ background: 'var(--bg2)', border: '0.5px solid var(--bo)', borderRadius: 14, padding: '13px 15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', transition: 'border-color .15s' }}>
             <div style={{ textAlign: 'left' }}>
               <div style={{ fontSize: 13, color: 'var(--tx)', fontWeight: 500, marginBottom: 2 }}>{l}</div>
               <div style={{ fontSize: 11, color: 'var(--tx3)' }}>{s}</div>
@@ -467,16 +444,22 @@ function Review({ cat, path, senderName, onStartSame, onCategories }) {
   };
 
   return (
-    <div className="lay" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: 'max(64px,10vh) 24px max(48px,8vh)' }}>
+    <div className="lay" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: 'max(64px,10vh) 24px max(48px,8vh)', animation: 'fi .32s ease both' }}>
       <div>
         <p style={{ fontSize: 11, color: 'var(--tx3)', letterSpacing: '.12em', marginBottom: 18, animation: 'fi .6s ease both' }}>
           {sender.toUpperCase()} LEFT YOU THIS
         </p>
         <div style={{ width: 22, height: 2, background: cat.col, marginBottom: 28, animation: 'fi .6s ease .1s both' }} />
         {hist.length >= 2 && (
-          <p style={{ fontSize: 11, color: 'var(--tx3)', lineHeight: 1.6, marginBottom: 16, animation: 'fi .6s ease .12s both' }}>
-            {hist[hist.length - 2].q} → "{hist[hist.length - 2].label}"
-          </p>
+          <div style={{ marginBottom: 20, animation: 'fi .6s ease .12s both' }}>
+            <div style={{ fontSize: 10, color: 'var(--tx3)', letterSpacing: '.08em', marginBottom: 6 }}>TO UNDERSTAND WHY THEY'RE ASKING —</div>
+            <p style={{ fontSize: 12, color: 'var(--tx3)', lineHeight: 1.6, fontStyle: 'italic' }}>
+              "{hist[hist.length - 2].q}"
+            </p>
+            <p style={{ fontSize: 11, color: 'var(--tx3)', marginTop: 4, opacity: .6 }}>
+              They answered: "{hist[hist.length - 2].label}"
+            </p>
+          </div>
         )}
         <p style={{ fontFamily: "'Playfair Display',serif", fontStyle: 'italic', fontSize: 'clamp(20px,5.5vw,28px)', lineHeight: 1.75, color: 'var(--tx)', animation: 'up .7s ease .2s both' }}>
           {last.q}
@@ -524,7 +507,7 @@ function ReplyView({ cat, path, senderName, replyText, onHome }) {
   const sender = senderName || 'Someone';
 
   return (
-    <div className="lay" style={{ padding: 'max(64px,10vh) 24px max(48px,8vh)' }}>
+    <div className="lay" style={{ padding: 'max(64px,10vh) 24px max(48px,8vh)', animation: 'fi .32s ease both' }}>
       <p style={{ fontSize: 11, color: 'var(--tx3)', letterSpacing: '.12em', marginBottom: 18, animation: 'fi .6s ease both' }}>
         {sender.toUpperCase()} ANSWERED
       </p>

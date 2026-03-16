@@ -34,4 +34,7 @@ background-repeat:repeat;background-size:200px 200px}
 .lay{position:fixed;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:max(32px,env(safe-area-inset-bottom))}
 .scanbar{position:absolute;left:0;right:0;height:1px;background:rgba(255,255,255,.07);pointer-events:none;z-index:20;animation:scan 1.4s ease forwards}
 button{font-family:'DM Sans',sans-serif;cursor:pointer;touch-action:manipulation}
+.card-btn:active{transform:scale(.97);border-color:var(--boh)}
+.branch-btn:active{background:var(--bg3)}
+.copy-btn:active{border-color:var(--boh)}
 ::-webkit-scrollbar{display:none}
