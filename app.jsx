@@ -473,48 +473,13 @@ function Final({ cat, path, name, onHome }) {
   );
 }
 
-/* ── Review (received link) — 4-beat sequence ── */
+/* ── Review (received link) ── */
 function Review({ cat, path, senderName, onStartSame, onCategories }) {
   const hist = getHist(cat, path);
   const last = hist[hist.length - 1];
-  const [beat, setBeat] = useState(1);
-  const [revIdx, setRevIdx] = useState(0);
   const [answer, setAnswer] = useState('');
   const [sent, setSent] = useState(false);
   const sender = senderName || 'Someone';
-
-  // Beat 1: presence message, auto-advance after 3s
-  useEffect(() => {
-    if (beat !== 1) return;
-    const t = setTimeout(() => setBeat(2), 3000);
-    return () => clearTimeout(t);
-  }, [beat]);
-
-  // Beat 2: reveal path items one by one
-  useEffect(() => {
-    if (beat !== 2) return;
-    const items = hist.slice(0, -1);
-    if (revIdx >= items.length) {
-      const t = setTimeout(() => setBeat(3), 1200);
-      return () => clearTimeout(t);
-    }
-    const t = setTimeout(() => setRevIdx(n => n + 1), 1600);
-    return () => clearTimeout(t);
-  }, [beat, revIdx]);
-
-  // Beat 3: final question alone with depth-4 mood shift, then advance after 4s
-  useEffect(() => {
-    if (beat !== 3) return;
-    document.body.style.backgroundColor = BG_COLORS[4];
-    const r = document.documentElement.style;
-    r.setProperty('--tx',  TX_COLORS[4]);
-    r.setProperty('--tx2', TX2_COLORS[4]);
-    r.setProperty('--tx3', TX3_COLORS[4]);
-    r.setProperty('--ac',  AC_COLORS[4]);
-    r.setProperty('--acd', ACD_COLORS[4]);
-    const t = setTimeout(() => setBeat(4), 4000);
-    return () => clearTimeout(t);
-  }, [beat]);
 
   const sendBack = async () => {
     const orig = new URLSearchParams(window.location.search).get('s');
@@ -525,60 +490,40 @@ function Review({ cat, path, senderName, onStartSame, onCategories }) {
     setSent(true);
   };
 
-  if (beat === 1) return (
-    <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <p style={{ fontFamily: "'Playfair Display',serif", fontStyle: 'italic', fontSize: 'clamp(18px,5vw,26px)', color: 'var(--tx)', textAlign: 'center', padding: '0 32px', lineHeight: 1.8, animation: 'fi 1s ease both' }}>
-        {sender} went somewhere<br/>and left you this.
-      </p>
-    </div>
-  );
-
-  if (beat === 2) {
-    const items = hist.slice(0, -1);
-    return (
-      <div className="lay" style={{ display: 'flex', flexDirection: 'column', padding: 'max(72px,11vh) 22px 40px' }}>
-        {items.slice(0, revIdx).map((h, i) => (
-          <div key={i} style={{ animation: 'fi .8s ease both', borderLeft: '1.5px solid var(--bo)', paddingLeft: 13, paddingBottom: 16, marginLeft: 4 }}>
-            <div style={{ fontSize: 10, color: 'var(--tx3)', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '.08em' }}>{dname(i)}</div>
-            <p style={{ fontFamily: "'Playfair Display',serif", fontSize: 13, color: 'var(--tx2)', lineHeight: 1.6, marginBottom: h.label ? 5 : 0 }}>{h.q}</p>
-            {h.label && <span style={{ fontSize: 10, color: 'var(--tx3)', background: 'var(--bg2)', border: '0.5px solid var(--bo)', borderRadius: 100, padding: '2px 10px', display: 'inline-block' }}>"{h.label}"</span>}
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  if (beat === 3) return (
-    <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 32px' }}>
-      <p style={{ fontFamily: "'Playfair Display',serif", fontStyle: 'italic', fontSize: 'clamp(19px,5.2vw,27px)', lineHeight: 1.85, color: 'var(--tx)', textAlign: 'center', animation: 'fi 1.2s ease both' }}>
-        {last.q}
-      </p>
-    </div>
-  );
-
-  // Beat 4: response field
   return (
-    <div className="lay" style={{ display: 'flex', flexDirection: 'column', padding: 'max(72px,11vh) 22px max(48px,8vh)' }}>
-      <p style={{ fontFamily: "'Playfair Display',serif", fontStyle: 'italic', fontSize: 'clamp(16px,4.5vw,21px)', color: 'var(--tx)', lineHeight: 1.72, marginBottom: 24, animation: 'fi .8s ease both' }}>{last.q}</p>
+    <div className="lay" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: 'max(64px,10vh) 24px max(48px,8vh)' }}>
+      <div>
+        <p style={{ fontSize: 11, color: 'var(--tx3)', letterSpacing: '.12em', marginBottom: 18, animation: 'fi .6s ease both' }}>
+          {sender.toUpperCase()} LEFT YOU THIS
+        </p>
+        <div style={{ width: 22, height: 2, background: cat.col, marginBottom: 28, animation: 'fi .6s ease .1s both' }} />
+        <p style={{ fontFamily: "'Playfair Display',serif", fontStyle: 'italic', fontSize: 'clamp(20px,5.5vw,28px)', lineHeight: 1.75, color: 'var(--tx)', animation: 'up .7s ease .15s both' }}>
+          {last.q}
+        </p>
+      </div>
       {!sent ? (
-        <div style={{ animation: 'up .5s ease .2s both' }}>
+        <div style={{ animation: 'up .5s ease .3s both' }}>
+          <div style={{ fontSize: 11, color: 'var(--tx3)', letterSpacing: '.1em', marginBottom: 10 }}>WHAT'S YOUR ANSWER?</div>
           <textarea
             value={answer} onChange={e => setAnswer(e.target.value)}
-            placeholder="Your answer..."
+            placeholder="Take your time..."
             rows={4}
-            style={{ width: '100%', background: 'var(--bg2)', border: '0.5px solid var(--bo)', borderRadius: 12, padding: '13px 14px', color: 'var(--tx)', fontSize: 14, outline: 'none', fontFamily: "'DM Sans',sans-serif", resize: 'none', lineHeight: 1.6, marginBottom: 12 }}
+            style={{ width: '100%', background: 'var(--bg2)', border: '0.5px solid var(--bo)', borderRadius: 12, padding: '14px', color: 'var(--tx)', fontSize: 14, outline: 'none', fontFamily: "'DM Sans',sans-serif", resize: 'none', lineHeight: 1.6, marginBottom: 12 }}
             onFocus={e => e.target.style.borderColor = 'var(--boh)'}
             onBlur={e => e.target.style.borderColor = 'var(--bo)'}
           />
           {answer.trim() && (
-            <button onClick={sendBack} style={{ width: '100%', padding: '16px', background: 'var(--tx)', color: 'var(--bg)', border: 'none', borderRadius: 14, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
+            <button onClick={sendBack} style={{ width: '100%', padding: '17px', background: 'var(--tx)', color: 'var(--bg)', border: 'none', borderRadius: 14, fontSize: 14, fontWeight: 500, cursor: 'pointer', marginBottom: 14 }}>
               Send back to {sender} →
             </button>
           )}
+          <button onClick={onStartSame} style={{ background: 'none', border: 'none', color: 'var(--tx3)', fontSize: 11, letterSpacing: '.1em', cursor: 'pointer', padding: '8px 0', width: '100%', textAlign: 'center' }}>
+            WANT TO PLAY YOUR OWN ROUND?
+          </button>
         </div>
       ) : (
         <div style={{ animation: 'up .5s ease both', display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <p style={{ fontSize: 13, color: 'var(--tx3)', textAlign: 'center', marginBottom: 8 }}>✓ Copied to clipboard — paste it to {sender}</p>
+          <p style={{ fontSize: 13, color: 'var(--tx3)', textAlign: 'center', marginBottom: 8 }}>✓ Copied — paste the link back to {sender}</p>
           <button onClick={onStartSame} style={{ background: 'var(--bg2)', border: '0.5px solid var(--bo)', borderRadius: 14, padding: '16px', fontSize: 14, color: 'var(--tx)', cursor: 'pointer' }}>
             Play {cat.name} →
           </button>
@@ -598,27 +543,23 @@ function ReplyView({ cat, path, senderName, replyText, onHome }) {
   const sender = senderName || 'Someone';
 
   return (
-    <div className="lay" style={{ padding: 'max(52px,8vh) 22px max(52px,8vh)' }}>
-      <div style={{ animation: 'up .4s ease both', marginBottom: 24 }}>
-        <p style={{ fontSize: 10, color: 'var(--tx3)', letterSpacing: '.12em', marginBottom: 12 }}>{sender.toUpperCase()} REPLIED</p>
-        <div style={{ width: 22, height: 2, background: cat.col, marginBottom: 14 }} />
+    <div className="lay" style={{ padding: 'max(64px,10vh) 24px max(48px,8vh)' }}>
+      <p style={{ fontSize: 11, color: 'var(--tx3)', letterSpacing: '.12em', marginBottom: 18, animation: 'fi .6s ease both' }}>
+        {sender.toUpperCase()} ANSWERED
+      </p>
+      <div style={{ width: 22, height: 2, background: cat.col, marginBottom: 32, animation: 'fi .6s ease .1s both' }} />
+      <div style={{ marginBottom: 28, animation: 'up .5s ease .15s both' }}>
+        <div style={{ fontSize: 10, color: 'var(--tx3)', letterSpacing: '.1em', marginBottom: 10 }}>YOU ASKED</div>
+        <p style={{ fontFamily: "'Playfair Display',serif", fontStyle: 'italic', fontSize: 'clamp(16px,4.5vw,20px)', color: 'var(--tx2)', lineHeight: 1.72 }}>{last.q}</p>
       </div>
-      <div style={{ marginBottom: 20 }}>
-        {hist.slice(0, -1).map((h, i) => (
-          <div key={i} style={{ borderLeft: '1.5px solid var(--bo)', paddingLeft: 13, paddingBottom: 12, marginLeft: 4 }}>
-            <div style={{ fontSize: 10, color: 'var(--tx3)', marginBottom: 2, textTransform: 'uppercase', letterSpacing: '.08em' }}>{dname(i)}</div>
-            {h.label && <span style={{ fontSize: 10, color: 'var(--tx3)' }}>→ "{h.label}"</span>}
-          </div>
-        ))}
+      <div style={{ width: '100%', height: 1, background: 'var(--bo)', marginBottom: 28 }} />
+      <div style={{ marginBottom: 40, animation: 'up .5s ease .25s both' }}>
+        <div style={{ fontSize: 10, color: 'var(--tx3)', letterSpacing: '.1em', marginBottom: 10 }}>THEY SAID</div>
+        <p style={{ fontSize: 16, color: 'var(--tx)', lineHeight: 1.75, fontStyle: 'italic' }}>{replyText}</p>
       </div>
-      <div style={{ animation: 'up .4s ease .1s both', borderLeft: `2px solid ${cat.col}`, paddingLeft: 13, marginLeft: 4, marginBottom: 24 }}>
-        <div style={{ fontSize: 10, color: cat.col, marginBottom: 8, letterSpacing: '.08em' }}>THE QUESTION</div>
-        <p style={{ fontFamily: "'Playfair Display',serif", fontStyle: 'italic', fontSize: 'clamp(16px,4.5vw,20px)', color: 'var(--tx)', lineHeight: 1.72, marginBottom: 16 }}>{last.q}</p>
-        <div style={{ width: '100%', height: 1, background: 'var(--bo)', marginBottom: 16 }} />
-        <div style={{ fontSize: 10, color: 'var(--tx3)', marginBottom: 8, letterSpacing: '.08em' }}>THEIR ANSWER</div>
-        <p style={{ fontSize: 15, color: 'var(--tx)', lineHeight: 1.7, fontStyle: 'italic' }}>{replyText}</p>
-      </div>
-      <button onClick={onHome} style={{ background: 'none', border: 'none', color: 'var(--tx3)', fontSize: 11, padding: '12px', cursor: 'pointer', letterSpacing: '.08em', display: 'block', width: '100%', textAlign: 'center' }}>BACK TO HOME</button>
+      <button onClick={onHome} style={{ background: 'var(--bg2)', border: '0.5px solid var(--bo)', borderRadius: 14, padding: '16px', fontSize: 14, color: 'var(--tx)', cursor: 'pointer', width: '100%', animation: 'up .5s ease .35s both' }}>
+        Play another round →
+      </button>
     </div>
   );
 }
