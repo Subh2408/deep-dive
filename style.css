@@ -1,0 +1,36 @@
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#050505;--bg2:#0d0d0d;--bg3:#181818;
+  --bo:rgba(255,255,255,0.06);--boh:rgba(255,255,255,0.13);
+  --tx:#ede8de;--tx2:rgba(237,232,222,0.5);--tx3:rgba(237,232,222,0.24);
+  --ac:#b8924e;--acd:rgba(184,146,78,0.12);
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);transition:background-color 3s ease;-webkit-tap-highlight-color:transparent}
+body{font-family:'DM Sans',sans-serif;color:var(--tx);overscroll-behavior:none;user-select:none}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.038;
+background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+background-repeat:repeat;background-size:200px 200px}
+#root{height:100%;position:relative;z-index:1}
+#bgc{position:fixed;inset:0;z-index:0;pointer-events:none}
+
+/* Loader */
+#loader{position:fixed;inset:0;z-index:500;background:#050505;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;transition:opacity .7s ease}
+#loader.gone{opacity:0;pointer-events:none}
+.ld{width:5px;height:5px;border-radius:50%;background:#b8924e;animation:ldp 1.2s ease infinite}
+.ld:nth-child(2){animation-delay:.2s}.ld:nth-child(3){animation-delay:.4s}
+
+/* Animations */
+@keyframes ldp{0%,80%,100%{opacity:.12;transform:scale(.7)}40%{opacity:1;transform:scale(1)}}
+@keyframes up{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes fi{from{opacity:0}to{opacity:1}}
+@keyframes scan{from{top:0;opacity:.6}to{top:100%;opacity:0}}
+@keyframes blink{0%,100%{opacity:.3}50%{opacity:.85}}
+@keyframes breathe{0%,100%{opacity:.5}50%{opacity:1}}
+
+/* Utilities */
+.up{animation:up .38s cubic-bezier(.22,.68,0,1.2) both}
+.fi{animation:fi .4s ease both}
+.lay{position:fixed;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:max(32px,env(safe-area-inset-bottom))}
+.scanbar{position:absolute;left:0;right:0;height:1px;background:rgba(255,255,255,.07);pointer-events:none;z-index:20;animation:scan 1.4s ease forwards}
+button{font-family:'DM Sans',sans-serif;cursor:pointer;touch-action:manipulation}
+::-webkit-scrollbar{display:none}

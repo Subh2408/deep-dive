@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
+  <meta name="theme-color" content="#050505"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <title>Deep Dive</title>
+  <meta property="og:title" content="Someone left you a question."/>
+  <meta property="og:description" content="They went somewhere. This is what they found."/>
+  <meta property="og:type" content="website"/>
+  <!-- TODO: og:image requires a hosted static image -->
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400;1,500&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+  <canvas id="bgc"></canvas>
+  <div id="loader">
+    <div style="display:flex;gap:8px">
+      <div class="ld"></div>
+      <div class="ld"></div>
+      <div class="ld"></div>
+    </div>
+    <span style="font-size:11px;letter-spacing:.12em;color:rgba(237,232,222,.22)">LOADING</span>
+  </div>
+  <div id="root"></div>
+
+  <!-- Plain JS — loaded before Babel, no transpilation needed -->
+  <script src="data.js"></script>
+  <script src="audio.js"></script>
+  <script src="particles.js"></script>
+
+  <!-- React + Babel from CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7/babel.min.js"></script>
+
+  <!-- React components — Babel only touches this small file -->
+  <script type="text/babel" src="app.jsx"></script>
+</body>
+</html>
