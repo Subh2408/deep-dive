@@ -1,5 +1,5 @@
 /* Deep Dive — React App
-   Globals expected: CATS, SUBS (data.js), Aud (audio.js), startParticles (particles.js) */
+   Globals expected: CATS, SUBS (data.js), startParticles (particles.js) */
 
 const { useState, useEffect, useRef, useCallback } = React;
 
@@ -49,7 +49,6 @@ function App() {
   const [cat, setCat]       = useState(null);
   const [path, setPath]     = useState([]);
   const [name, setName]     = useState('');
-  const [muted, setMuted]   = useState(false);
   const [black, setBlack]   = useState(false);
   const [replyText, setReplyText] = useState('');
   const pRef = useRef(null);
@@ -80,7 +79,6 @@ function App() {
 
   useEffect(() => {
     if (pRef.current) pRef.current.setDepth(path.length);
-    Aud.depth(path.length);
   }, [path]);
 
   useEffect(() => {
@@ -99,18 +97,17 @@ function App() {
     setTimeout(() => { fn(); setTimeout(() => setBlack(false), fast ? 100 : 180); }, fast ? 150 : 460);
   }, []);
 
-  const startCat = c => { Aud.init(); setCat(c); setPath([]); fade(() => setScreen('question')); };
+  const startCat = c => { setCat(c); setPath([]); fade(() => setScreen('question')); };
   const chooseBranch = idx => {
     const np = [...path, idx];
     const node = getNode(cat, np);
     fade(() => {
       setPath(np);
-      if (!node.br || !node.br.length) { Aud.silence(.8); setScreen('silence'); }
+      if (!node.br || !node.br.length) { setScreen('silence'); }
     });
   };
   const goHome = () => fade(() => { setCat(null); setPath([]); setScreen('splash'); window.history.replaceState(null, '', window.location.pathname); }, true);
-  const toggleMute = () => setMuted(Aud.mute());
-  const startSameCat = () => { Aud.init(); setPath([]); fade(() => setScreen('question')); };
+  const startSameCat = () => { setPath([]); fade(() => setScreen('question')); };
   const goToCategories = () => fade(() => setScreen('categories'));
   const goBack = () => { if (path.length > 0) fade(() => setPath(path.slice(0, -1))); };
 
@@ -121,15 +118,10 @@ function App() {
     <div style={{ position: 'fixed', inset: 0, zIndex: 1 }}>
       <div style={{ position: 'fixed', inset: 0, zIndex: 0, background: BG_BLOOM[Math.min(dep, 4)], pointerEvents: 'none' }} />
       {black && <div style={{ position: 'fixed', inset: 0, background: '#000', zIndex: 200, pointerEvents: 'none' }} />}
-      {screen !== 'splash' && screen !== 'categories' && (
-        <button onClick={toggleMute} style={{ position: 'fixed', top: 16, right: 16, zIndex: 150, background: 'none', border: 'none', color: 'var(--tx3)', fontSize: 10, letterSpacing: '.1em', cursor: 'pointer', padding: '8px 4px' }}>
-          {muted ? 'SOUND OFF' : 'SOUND ON'}
-        </button>
-      )}
-      {screen === 'splash'     && <Splash    onStart={() => { Aud.init(); setScreen('categories'); }} />}
+      {screen === 'splash'     && <Splash    onStart={() => setScreen('categories')} />}
       {screen === 'categories' && <CardGrid  onSelect={startCat} onBack={goHome} />}
       {screen === 'question'   && cat && <Question key={path.join(',')} cat={cat} node={node} depth={dep} path={path} onChoose={chooseBranch} onHome={goHome} onBack={goBack} />}
-      {screen === 'silence'    && cat && <Silence  cat={cat} path={path} onDone={() => { Aud.restore(); fade(() => setScreen('send')); }} />}
+      {screen === 'silence'    && cat && <Silence  cat={cat} node={node} onDone={() => fade(() => setScreen('send'))} />}
       {screen === 'send'       && cat && <Send     cat={cat} path={path} name={name} onNameChange={setName} onDone={() => fade(() => setScreen('final'))} onHome={goHome} />}
       {screen === 'final'      && cat && <Final    cat={cat} path={path} name={name} onHome={goHome} />}
       {screen === 'review'     && cat && <Review    cat={cat} path={path} senderName={name} onStartSame={startSameCat} onCategories={goToCategories} />}
@@ -140,12 +132,9 @@ function App() {
 
 /* ── Splash ── */
 function Splash({ onStart }) {
-  const [letters, setLetters]     = useState('');
-  const [subIdx, setSubIdx]       = useState(0);
-  const [subVis, setSubVis]       = useState(true);
-  const [pressing, setPressing]   = useState(false);
-  const [prog, setProg]           = useState(0);
-  const pTimer = useRef(null);
+  const [letters, setLetters] = useState('');
+  const [subIdx, setSubIdx]   = useState(0);
+  const [subVis, setSubVis]   = useState(true);
   const full = "Deep Dive.";
 
   useEffect(() => {
@@ -167,18 +156,6 @@ function Splash({ onStart }) {
     return () => clearInterval(t);
   }, []);
 
-  const startPress = () => {
-    setPressing(true); setProg(0);
-    const t0 = Date.now();
-    pTimer.current = setInterval(() => {
-      const p = Math.min((Date.now() - t0) / 2200, 1);
-      setProg(p);
-      if (p >= 1) { clearInterval(pTimer.current); if (navigator.vibrate) navigator.vibrate([8, 40, 16]); onStart(); }
-    }, 16);
-  };
-  const endPress = () => { if (prog < 1) { clearInterval(pTimer.current); setPressing(false); setProg(0); } };
-  const R = 26, C = 2 * Math.PI * R;
-
   return (
     <div className="lay" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: 'max(72px,11vh) 28px max(64px,10vh)' }}>
       <div>
@@ -191,16 +168,11 @@ function Splash({ onStart }) {
         </p>
       </div>
       <div style={{ animation: 'fi .6s ease .4s both' }}>
-        <p style={{ fontSize: 11, color: 'var(--tx3)', marginBottom: 22, letterSpacing: '.12em' }}>HOLD TO BEGIN</p>
+        <p style={{ fontSize: 11, color: 'var(--tx3)', marginBottom: 22, letterSpacing: '.12em' }}>TAP TO BEGIN</p>
         <div style={{ display: 'flex', alignItems: 'center', gap: 22 }}>
-          <div onMouseDown={startPress} onMouseUp={endPress} onMouseLeave={endPress}
-            onTouchStart={e => { e.preventDefault(); startPress(); }} onTouchEnd={endPress} onTouchCancel={endPress}
-            style={{ width: 60, height: 60, borderRadius: '50%', background: 'var(--bg2)', border: '0.5px solid var(--boh)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', cursor: 'pointer', transform: pressing ? 'scale(.93)' : 'scale(1)', transition: 'transform .1s ease', flexShrink: 0, touchAction: 'none' }}>
-            <svg width={60} height={60} style={{ position: 'absolute', inset: 0, transform: 'rotate(-90deg)' }}>
-              <circle cx={30} cy={30} r={R} fill="none" stroke="var(--acd)" strokeWidth={2} />
-              <circle cx={30} cy={30} r={R} fill="none" stroke="var(--ac)" strokeWidth={2} strokeDasharray={C} strokeDashoffset={C * (1 - prog)} style={{ transition: 'stroke-dashoffset .04s linear' }} />
-            </svg>
-            <span style={{ fontSize: 19, color: 'var(--tx3)', zIndex: 1, userSelect: 'none', animation: 'breathe 3s ease infinite' }}>↓</span>
+          <div onClick={onStart}
+            style={{ width: 60, height: 60, borderRadius: '50%', background: 'var(--bg2)', border: '0.5px solid var(--boh)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, touchAction: 'manipulation' }}>
+            <span style={{ fontSize: 19, color: 'var(--tx3)', userSelect: 'none', animation: 'breathe 3s ease infinite' }}>↓</span>
           </div>
           <div>
             <div style={{ fontSize: 13, color: 'var(--tx2)', fontWeight: 500, marginBottom: 3 }}>8 themes</div>
@@ -315,19 +287,18 @@ function Question({ cat, node, depth, path, onChoose, onHome, onBack }) {
 }
 
 /* ── Silence (final question) ── */
-function Silence({ cat, path, onDone }) {
+function Silence({ cat, node, onDone }) {
   const [disp, setDisp]       = useState('');
   const [ctaOp, setCtaOp]     = useState(0);
   const [ready, setReady]     = useState(false);
   const [progress, setProgress] = useState(0);
-  const node = getNode(cat, path);
 
   useEffect(() => {
     const words = node.q.split(' '); let i = 0;
     const next = () => {
       if (i >= words.length) {
         const t0 = Date.now();
-        const DURATION = 15000;
+        const DURATION = 5000;
         const tick = setInterval(() => {
           const p = Math.min((Date.now() - t0) / DURATION, 1);
           setProgress(p);
@@ -423,11 +394,15 @@ function Final({ cat, path, name, onHome }) {
     const enc = encSession(name || 'Someone', cat.id, path);
     const url = `${location.origin}${location.pathname}?s=${enc}`;
     const displayName = name.trim() || 'Someone';
+    const finalQ = hist[hist.length - 1].q;
+    const parent = hist.length >= 2 ? hist[hist.length - 2] : null;
     const text = type === 'link' ? url :
-      `${displayName} played Deep Dive and left you something.\n\n` +
+      `${displayName} went deep into ${cat.name} and left you this.\n` +
       `━━━━━━━━━━━━━━━━━━━━━━\n` +
-      hist.slice(0, -1).map((h, i) => `${dname(i)}: ${h.q}\n→ "${h.label}"`).join('\n\n') +
-      `\n\n━━━━━━━━━━━━━━━━━━━━━━\nThey left you this question:\n\n${hist[hist.length - 1].q}\n\n— deepdive`;
+      (parent ? `${parent.q}\n→ "${parent.label}"\n\n` : '') +
+      `They're asking you:\n${finalQ}\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `Open it: ${url}`;
     try { await navigator.clipboard.writeText(text); }
     catch { const ta = Object.assign(document.createElement('textarea'), { value: text, style: 'position:fixed;opacity:0' }); document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
     setCopied(type); setTimeout(() => setCopied(''), 2400);
@@ -454,7 +429,7 @@ function Final({ cat, path, name, onHome }) {
         <p style={{ fontSize: 10, color: 'var(--tx3)', letterSpacing: '.1em', marginBottom: 3 }}>SEND TO YOUR FRIEND</p>
         {[
           { t: 'link', l: 'Copy link', s: 'They open it and see your path + the question' },
-          { t: 'text', l: 'Copy as text', s: 'Paste into WhatsApp, iMessage, email' }
+          { t: 'text', l: 'Copy as text', s: 'One question + context — paste anywhere' }
         ].map(({ t, l, s }) => (
           <button key={t} onClick={() => copyIt(t)}
             style={{ background: 'var(--bg2)', border: '0.5px solid var(--bo)', borderRadius: 14, padding: '13px 15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', transition: 'border-color .15s' }}
@@ -497,7 +472,12 @@ function Review({ cat, path, senderName, onStartSame, onCategories }) {
           {sender.toUpperCase()} LEFT YOU THIS
         </p>
         <div style={{ width: 22, height: 2, background: cat.col, marginBottom: 28, animation: 'fi .6s ease .1s both' }} />
-        <p style={{ fontFamily: "'Playfair Display',serif", fontStyle: 'italic', fontSize: 'clamp(20px,5.5vw,28px)', lineHeight: 1.75, color: 'var(--tx)', animation: 'up .7s ease .15s both' }}>
+        {hist.length >= 2 && (
+          <p style={{ fontSize: 11, color: 'var(--tx3)', lineHeight: 1.6, marginBottom: 16, animation: 'fi .6s ease .12s both' }}>
+            {hist[hist.length - 2].q} → "{hist[hist.length - 2].label}"
+          </p>
+        )}
+        <p style={{ fontFamily: "'Playfair Display',serif", fontStyle: 'italic', fontSize: 'clamp(20px,5.5vw,28px)', lineHeight: 1.75, color: 'var(--tx)', animation: 'up .7s ease .2s both' }}>
           {last.q}
         </p>
       </div>
