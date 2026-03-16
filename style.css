@@ -24,6 +24,7 @@ background-repeat:repeat;background-size:200px 200px}
 @keyframes up{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 @keyframes fi{from{opacity:0}to{opacity:1}}
 @keyframes scan{from{top:0;opacity:.6}to{top:100%;opacity:0}}
+@keyframes progfill{from{width:0}to{width:100%}}
 @keyframes blink{0%,100%{opacity:.3}50%{opacity:.85}}
 @keyframes breathe{0%,100%{opacity:.5}50%{opacity:1}}
 

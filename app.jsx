@@ -121,7 +121,7 @@ function App() {
       {screen === 'splash'     && <Splash    onStart={() => setScreen('categories')} />}
       {screen === 'categories' && <CardGrid  onSelect={startCat} onBack={goHome} />}
       {screen === 'question'   && cat && <Question key={path.join(',')} cat={cat} node={node} depth={dep} path={path} onChoose={chooseBranch} onHome={goHome} onBack={goBack} />}
-      {screen === 'silence'    && cat && <Silence  cat={cat} node={node} onDone={() => fade(() => setScreen('send'))} />}
+      {screen === 'silence'    && cat && <Silence  cat={cat} path={path} onDone={() => fade(() => setScreen('send'))} />}
       {screen === 'send'       && cat && <Send     cat={cat} path={path} name={name} onNameChange={setName} onDone={() => fade(() => setScreen('final'))} onHome={goHome} />}
       {screen === 'final'      && cat && <Final    cat={cat} path={path} name={name} onHome={goHome} />}
       {screen === 'review'     && cat && <Review    cat={cat} path={path} senderName={name} onStartSame={startSameCat} onCategories={goToCategories} />}
@@ -287,49 +287,50 @@ function Question({ cat, node, depth, path, onChoose, onHome, onBack }) {
 }
 
 /* ── Silence (final question) ── */
-function Silence({ cat, node, onDone }) {
-  const [disp, setDisp]       = useState('');
-  const [ctaOp, setCtaOp]     = useState(0);
-  const [ready, setReady]     = useState(false);
-  const [progress, setProgress] = useState(0);
+function Silence({ cat, path, onDone }) {
+  const [disp, setDisp] = useState('');
+  const [ready, setReady] = useState(false);
+  const ran = useRef(false);
+
+  // The final question lives on parentNode.br[lastIdx], not at getNode(cat, path)
+  const parentPath = path.slice(0, -1);
+  const lastIdx    = path[path.length - 1];
+  const parentNode = getNode(cat, parentPath);
+  const question   = parentNode.br[lastIdx].q;
 
   useEffect(() => {
-    const words = node.q.split(' '); let i = 0;
+    if (ran.current) return;
+    ran.current = true;
+    const words = question.split(' ');
+    let i = 0;
+    const timers = [];
     const next = () => {
       if (i >= words.length) {
-        const t0 = Date.now();
-        const DURATION = 5000;
-        const tick = setInterval(() => {
-          const p = Math.min((Date.now() - t0) / DURATION, 1);
-          setProgress(p);
-          if (p >= 1) {
-            clearInterval(tick);
-            setReady(true);
-            let o = 0;
-            const fdr = setInterval(() => { o += .018; setCtaOp(Math.min(o, 1)); if (o >= 1) clearInterval(fdr); }, 90);
-          }
-        }, 50);
+        timers.push(setTimeout(() => setReady(true), 5000));
         return;
       }
-      setDisp(p => p + (i > 0 ? ' ' : '') + words[i]); i++;
-      setTimeout(next, 112);
+      setDisp(p => p + (i > 0 ? ' ' : '') + words[i]);
+      i++;
+      timers.push(setTimeout(next, 100));
     };
-    setTimeout(next, 1600);
+    timers.push(setTimeout(next, 800));
+    return () => timers.forEach(clearTimeout);
   }, []);
 
   return (
-    <div className="lay" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 28px', background: '#000', textAlign: 'center' }}>
-      <div style={{ position: 'absolute', bottom: 0, left: 0, height: 2, width: `${progress * 100}%`, background: cat.col, transition: 'width .08s linear' }} />
+    <div className="lay" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 28px', background: '#000', textAlign: 'center', position: 'relative' }}>
       <div style={{ width: 1, height: 52, background: `${cat.col}33`, marginBottom: 44 }} />
       <p style={{ fontFamily: "'Playfair Display',serif", fontStyle: 'italic', fontSize: 'clamp(19px,5.2vw,27px)', lineHeight: 1.85, color: 'var(--tx)', maxWidth: 340, marginBottom: 52, minHeight: '5em' }}>
-        {disp}{disp !== node.q && <span style={{ opacity: .25 }}>▋</span>}
+        {disp}
+        {disp.length < question.length && <span style={{ opacity: .25 }}>▋</span>}
       </p>
       <div style={{ width: 40, height: 1, background: `${cat.col}33`, marginBottom: ready ? 36 : 0, transition: 'margin .6s' }} />
       {ready && (
-        <button onClick={onDone} style={{ background: 'none', border: 'none', color: 'var(--tx2)', fontSize: 12, letterSpacing: '.1em', cursor: 'pointer', padding: '14px', opacity: ctaOp, transition: 'opacity .3s' }}>
+        <button onClick={onDone} style={{ background: 'none', border: 'none', color: 'var(--tx2)', fontSize: 12, letterSpacing: '.1em', cursor: 'pointer', padding: '20px', touchAction: 'manipulation' }}>
           WHEN YOU'RE READY →
         </button>
       )}
+      <div style={{ position: 'absolute', bottom: 0, left: 0, height: 2, background: cat.col, opacity: .4, animation: 'progfill 5s linear forwards' }} />
     </div>
   );
 }
