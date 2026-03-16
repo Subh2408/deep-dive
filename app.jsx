@@ -35,6 +35,13 @@ const TX2_COLORS = ['rgba(237,232,222,0.5)','rgba(237,232,222,0.5)','rgba(240,23
 const TX3_COLORS = ['rgba(237,232,222,0.24)','rgba(237,232,222,0.24)','rgba(240,230,208,0.24)','rgba(240,230,208,0.24)','rgba(255,255,255,0.24)'];
 const AC_COLORS  = ['#b8924e','#b8924e','#c9902a','#c9902a','#c4622a'];
 const ACD_COLORS = ['rgba(184,146,78,0.12)','rgba(184,146,78,0.12)','rgba(201,144,42,0.12)','rgba(201,144,42,0.12)','rgba(196,98,42,0.12)'];
+const BG_BLOOM = [
+  'radial-gradient(ellipse 80% 60% at 85% 15%, #1a1f3a 0%, transparent 70%)',
+  'radial-gradient(ellipse 70% 55% at 20% 45%, #1a1428 0%, transparent 70%)',
+  'radial-gradient(ellipse 65% 65% at 80% 80%, #2a1a08 0%, transparent 70%)',
+  'radial-gradient(ellipse 60% 60% at 50% 85%, #2a0a10 0%, transparent 70%)',
+  'radial-gradient(ellipse 50% 50% at 50% 50%, #1a0f04 0%, transparent 70%)',
+];
 
 /* ── App ── */
 function App() {
@@ -101,6 +108,7 @@ function App() {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1 }}>
+      <div style={{ position: 'fixed', inset: 0, zIndex: 0, background: BG_BLOOM[Math.min(dep, 4)], pointerEvents: 'none' }} />
       {screen === 'splash'     && <Splash    onStart={() => setScreen('categories')} />}
       {screen === 'categories' && <CardGrid  onSelect={startCat} onBack={goHome} />}
       {screen === 'question'   && cat && <Question cat={cat} node={node} depth={dep} path={path} onChoose={chooseBranch} onHome={goHome} onBack={goBack} />}
