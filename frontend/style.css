@@ -7,9 +7,9 @@
 }
 html,body{height:100%;overflow:hidden;background:var(--bg);transition:background-color 3s ease;-webkit-tap-highlight-color:transparent}
 body{font-family:'DM Sans',sans-serif;color:var(--tx);overscroll-behavior:none;user-select:none}
-body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.038;
-background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-background-repeat:repeat;background-size:200px 200px}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;opacity:.04;
+background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+background-size:180px 180px}
 #root{height:100%;position:relative;z-index:1}
 #bgc{position:fixed;inset:0;z-index:0;pointer-events:none}
 
@@ -27,6 +27,7 @@ background-repeat:repeat;background-size:200px 200px}
 @keyframes progfill{from{width:0}to{width:100%}}
 @keyframes blink{0%,100%{opacity:.3}50%{opacity:.85}}
 @keyframes breathe{0%,100%{opacity:.5}50%{opacity:1}}
+@keyframes shimmer{0%,100%{opacity:.6}50%{opacity:1}}
 
 /* Utilities */
 .up{animation:up .38s cubic-bezier(.22,.68,0,1.2) both}
@@ -38,11 +39,3 @@ button{font-family:'DM Sans',sans-serif;cursor:pointer;touch-action:manipulation
 .branch-btn:active{background:var(--bg3)}
 .copy-btn:active{border-color:var(--boh)}
 ::-webkit-scrollbar{display:none}
-
-/* Bridge question loading */
-.bridge-loading{display:flex;flex-direction:column;align-items:flex-start;gap:10px}
-.bridge-pulse{width:100%;max-width:280px;height:2px;background:var(--bo);border-radius:1px;overflow:hidden;position:relative}
-.bridge-pulse::after{content:'';position:absolute;left:-60%;width:60%;height:100%;background:var(--ac);animation:bridgepulse 1.6s ease infinite}
-@keyframes bridgepulse{0%{left:-60%}100%{left:110%}}
-
-/* LLM loading dots inherit .ld styles already defined */

@@ -28,6 +28,28 @@ function getHist(cat, path) {
 }
 const dname = d => ['The surface', 'Deeper', 'Deeper still', 'The descent', 'The final question'][d] ?? 'Reflection';
 
+/* ── Claude API helper ── */
+async function callClaude(systemPrompt, userPrompt, maxTokens = 150) {
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': window.ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: maxTokens,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userPrompt }],
+    }),
+  });
+  if (!res.ok) throw new Error('API error ' + res.status);
+  const data = await res.json();
+  return data.content[0].text.trim();
+}
+
 /* ── Mood color system ── */
 const BG_COLORS  = ['#05080f','#080810','#0f0805','#100508','#000000'];
 const TX_COLORS  = ['#ede8de','#ede8de','#f0e6d0','#f0e6d0','#ffffff'];
@@ -50,6 +72,9 @@ function App() {
   const [path, setPath]     = useState([]);
   const [name, setName]     = useState('');
   const [replyText, setReplyText] = useState('');
+  const [llmQuestions, setLlmQuestions] = useState([]);
+  const [llmDepth, setLlmDepth]         = useState(0);
+  const [isLoadingLLM, setIsLoadingLLM] = useState(false);
   const pRef = useRef(null);
 
   const dep = path.length;
@@ -94,29 +119,51 @@ function App() {
     r.setProperty('--acd', ACD_COLORS[d]);
   }, [dep]);
 
-  const startCat = c => { setCat(c); setPath([]); setScreen('question'); };
+  const startCat = c => { setCat(c); setPath([]); setLlmQuestions([]); setLlmDepth(0); setScreen('question'); };
   const chooseBranch = idx => {
     const np = [...path, idx];
     const node = getNode(cat, np);
     setPath(np);
     if (!node.br || !node.br.length) { setScreen('silence'); }
   };
-  const goHome = () => { setCat(null); setPath([]); setScreen('splash'); window.history.replaceState(null, '', window.location.pathname); };
-  const startSameCat = () => { setPath([]); setScreen('question'); };
+  const goHome = () => { setCat(null); setPath([]); setLlmQuestions([]); setLlmDepth(0); setScreen('splash'); window.history.replaceState(null, '', window.location.pathname); };
+  const startSameCat = () => { setPath([]); setLlmQuestions([]); setLlmDepth(0); setScreen('question'); };
   const goToCategories = () => setScreen('categories');
   const goBack = () => { if (path.length > 0) setPath(path.slice(0, -1)); };
+
+  const handleGoDeeper = async () => {
+    setIsLoadingLLM(true);
+    setScreen('llm_question');
+    const hist = getHist(cat, path);
+    const fixedPath = hist.slice(0, -1).map(h => `- ${h.q}\n  They chose: "${h.label}"`).join('\n');
+    const prevLLM = llmQuestions.map((q, i) => `- [LLM level ${i+1}] ${q}`).join('\n');
+    const lastQ = llmQuestions.length > 0 ? llmQuestions[llmQuestions.length - 1] : hist[hist.length - 1].q;
+    const sys = `You are a facilitator of deep one-on-one conversations.\nYou write single follow-up questions that go one level deeper than the previous question based on the specific path this person has taken.\nThe question must be:\n- More personal and specific than the previous one\n- Impossible to answer without genuine reflection\n- Between 10 and 25 words\n- Never generic — it must only make sense given this specific path\nRespond with ONLY the question. No preamble, no quotes, no explanation.`;
+    const usr = `Theme: ${cat.name} — ${cat.sub}\n\nPath taken so far:\n${fixedPath}${prevLLM ? '\n' + prevLLM : ''}\n\nThe last question asked was:\n${lastQ}\n\nWrite the next question that goes one level deeper into this specific territory.`;
+    try {
+      const q = await callClaude(sys, usr, 150);
+      setLlmQuestions(prev => [...prev, q]);
+      setLlmDepth(d => d + 1);
+    } catch {
+      setScreen('send');
+    } finally {
+      setIsLoadingLLM(false);
+    }
+  };
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1 }}>
       <div style={{ position: 'fixed', inset: 0, zIndex: 0, background: BG_BLOOM[Math.min(dep, 4)], pointerEvents: 'none' }} />
-      {screen === 'splash'     && <Splash    onStart={() => setScreen('categories')} />}
-      {screen === 'categories' && <CardGrid  onSelect={startCat} onBack={goHome} />}
-      {screen === 'question'   && cat && <Question cat={cat} node={node} depth={dep} path={path} onChoose={chooseBranch} onHome={goHome} onBack={goBack} />}
-      {screen === 'silence'    && cat && <Silence  cat={cat} path={path} onDone={() => setScreen('send')} />}
-      {screen === 'send'       && cat && <Send     cat={cat} path={path} name={name} onNameChange={setName} onDone={() => setScreen('final')} onHome={goHome} />}
-      {screen === 'final'      && cat && <Final    cat={cat} path={path} name={name} onHome={goHome} />}
-      {screen === 'review'     && cat && <Review    cat={cat} path={path} senderName={name} onStartSame={startSameCat} onCategories={goToCategories} />}
-      {screen === 'reply'      && cat && <ReplyView cat={cat} path={path} senderName={name} replyText={replyText} onHome={goHome} />}
+      {screen === 'splash'       && <Splash    onStart={() => setScreen('categories')} />}
+      {screen === 'categories'   && <CardGrid  onSelect={startCat} onBack={goHome} />}
+      {screen === 'question'     && cat && <Question cat={cat} node={node} depth={dep} path={path} onChoose={chooseBranch} onHome={goHome} onBack={goBack} />}
+      {screen === 'silence'      && cat && <Silence  cat={cat} path={path} onDone={() => setScreen('send')} onGoDeeper={handleGoDeeper} />}
+      {screen === 'llm_question' && cat && <LLMQuestion cat={cat} question={llmQuestions[llmQuestions.length - 1]} isLoading={isLoadingLLM} llmDepth={llmDepth} onGoDeeper={handleGoDeeper} onDone={() => setScreen('send')} onHome={goHome} />}
+      {screen === 'send'         && cat && <Send     cat={cat} path={path} name={name} llmQuestions={llmQuestions} onNameChange={setName} onDone={() => setScreen('final')} onHome={goHome} />}
+      {screen === 'final'        && cat && <Final    cat={cat} path={path} name={name} llmQuestions={llmQuestions} llmDepth={llmDepth} onHome={goHome} onViewTree={() => setScreen('tree')} />}
+      {screen === 'tree'         && cat && <TreeView cat={cat} path={path} llmQuestions={llmQuestions} onBack={() => setScreen('final')} />}
+      {screen === 'review'       && cat && <Review    cat={cat} path={path} senderName={name} onStartSame={startSameCat} onCategories={goToCategories} />}
+      {screen === 'reply'        && cat && <ReplyView cat={cat} path={path} senderName={name} replyText={replyText} onHome={goHome} />}
     </div>
   );
 }
@@ -274,12 +321,11 @@ function Question({ cat, node, depth, path, onChoose, onHome, onBack }) {
 }
 
 /* ── Silence (final question) ── */
-function Silence({ cat, path, onDone }) {
+function Silence({ cat, path, onDone, onGoDeeper }) {
   const [disp, setDisp] = useState('');
   const [ready, setReady] = useState(false);
   const ran = useRef(false);
 
-  // The final question lives on parentNode.br[lastIdx], not at getNode(cat, path)
   const parentPath = path.slice(0, -1);
   const lastIdx    = path[path.length - 1];
   const parentNode = getNode(cat, parentPath);
@@ -313,17 +359,60 @@ function Silence({ cat, path, onDone }) {
       </p>
       <div style={{ width: 40, height: 1, background: `${cat.col}33`, marginBottom: ready ? 36 : 0, transition: 'margin .6s' }} />
       {ready && (
-        <button onClick={onDone} style={{ background: 'none', border: 'none', color: 'var(--tx2)', fontSize: 12, letterSpacing: '.1em', cursor: 'pointer', padding: '20px', touchAction: 'manipulation' }}>
-          WHEN YOU'RE READY →
-        </button>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, animation: 'fi .5s ease both' }}>
+          <button onClick={onGoDeeper} style={{ background: 'none', border: 'none', color: 'var(--tx)', fontSize: 12, letterSpacing: '.1em', cursor: 'pointer', padding: '16px 20px', touchAction: 'manipulation' }}>
+            GO DEEPER →
+          </button>
+          <button onClick={onDone} style={{ background: 'none', border: 'none', color: 'var(--tx3)', fontSize: 11, letterSpacing: '.1em', cursor: 'pointer', padding: '12px 20px', touchAction: 'manipulation' }}>
+            WHEN YOU'RE READY →
+          </button>
+        </div>
       )}
       <div style={{ position: 'absolute', bottom: 0, left: 0, height: 2, background: cat.col, opacity: .4, animation: 'progfill 5s linear forwards' }} />
     </div>
   );
 }
 
+/* ── LLM Question ("Beyond the map") ── */
+function LLMQuestion({ cat, question, isLoading, llmDepth, onGoDeeper, onDone, onHome }) {
+  const MAX_LLM = 4;
+
+  if (isLoading) {
+    return (
+      <div className="lay" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#000', textAlign: 'center' }}>
+        <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+          <div className="ld" /><div className="ld" /><div className="ld" />
+        </div>
+        <p style={{ fontSize: 11, color: 'var(--tx3)', letterSpacing: '.12em' }}>GOING DEEPER...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="lay" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 28px', background: '#000', textAlign: 'center', position: 'relative', animation: 'fi .32s ease both' }}>
+      <button onClick={onHome} style={{ position: 'absolute', top: 20, right: 20, background: 'none', border: 'none', color: 'var(--tx3)', fontSize: 14, cursor: 'pointer', padding: 8 }}>✕</button>
+      <div style={{ fontSize: 10, color: 'var(--tx3)', letterSpacing: '.12em', marginBottom: 40 }}>BEYOND THE MAP</div>
+      <div style={{ width: 1, height: 40, background: `${cat.col}33`, marginBottom: 36 }} />
+      <p style={{ fontFamily: "'Playfair Display',serif", fontStyle: 'italic', fontSize: 'clamp(19px,5.2vw,26px)', lineHeight: 1.85, color: 'var(--tx)', maxWidth: 340, marginBottom: 52 }}>
+        {question}
+      </p>
+      <div style={{ width: 40, height: 1, background: `${cat.col}33`, marginBottom: 36 }} />
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+        {llmDepth < MAX_LLM && (
+          <button onClick={onGoDeeper} style={{ background: 'none', border: 'none', color: 'var(--tx)', fontSize: 12, letterSpacing: '.1em', cursor: 'pointer', padding: '16px 20px', touchAction: 'manipulation' }}>
+            GO DEEPER →
+          </button>
+        )}
+        <button onClick={onDone} style={{ background: 'none', border: 'none', color: 'var(--tx3)', fontSize: 11, letterSpacing: '.1em', cursor: 'pointer', padding: '12px 20px', touchAction: 'manipulation' }}>
+          I'M DONE →
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /* ── Send (name + optional note before sharing) ── */
-function Send({ cat, path, name, onNameChange, onDone, onHome }) {
+function Send({ cat, path, name, llmQuestions, onNameChange, onDone, onHome }) {
   const hist = getHist(cat, path);
   const last = hist[hist.length - 1];
   const [note, setNote] = useState('');
@@ -339,6 +428,12 @@ function Send({ cat, path, name, onNameChange, onDone, onHome }) {
       <div style={{ animation: 'up .4s ease .06s both', background: 'var(--bg2)', border: `0.5px solid ${cat.col}55`, borderRadius: 14, padding: '16px', marginBottom: 22 }}>
         <div style={{ fontSize: 10, color: cat.col, letterSpacing: '.08em', marginBottom: 8 }}>THE QUESTION LEFT FOR THEM</div>
         <p style={{ fontFamily: "'Playfair Display',serif", fontStyle: 'italic', fontSize: 15, color: 'var(--tx)', lineHeight: 1.65 }}>{last.q}</p>
+        {llmQuestions.length > 0 && (
+          <div style={{ marginTop: 10, paddingTop: 10, borderTop: '0.5px solid var(--bo)' }}>
+            <div style={{ fontSize: 10, color: 'var(--tx3)', letterSpacing: '.08em', marginBottom: 6 }}>+{llmQuestions.length} BEYOND THE MAP</div>
+            <p style={{ fontFamily: "'Playfair Display',serif", fontStyle: 'italic', fontSize: 13, color: 'var(--tx2)', lineHeight: 1.6 }}>{llmQuestions[llmQuestions.length - 1]}</p>
+          </div>
+        )}
       </div>
       {/* Name input */}
       <div style={{ animation: 'up .4s ease .12s both', marginBottom: 14 }}>
@@ -374,7 +469,7 @@ function Send({ cat, path, name, onNameChange, onDone, onHome }) {
 }
 
 /* ── Final (share screen) ── */
-function Final({ cat, path, name, onHome }) {
+function Final({ cat, path, name, llmQuestions, llmDepth, onHome, onViewTree }) {
   const hist = getHist(cat, path);
   const [copied, setCopied] = useState('');
 
@@ -382,7 +477,7 @@ function Final({ cat, path, name, onHome }) {
     const enc = encSession(name || 'Someone', cat.id, path);
     const url = `${location.origin}${location.pathname}?s=${enc}`;
     const displayName = name.trim() || 'Someone';
-    const finalQ = hist[hist.length - 1].q;
+    const finalQ = llmQuestions.length > 0 ? llmQuestions[llmQuestions.length - 1] : hist[hist.length - 1].q;
     const parent = hist.length >= 2 ? hist[hist.length - 2] : null;
     const text = type === 'link' ? url :
       `${displayName} went deep into ${cat.name} and left you this.\n` +
@@ -412,6 +507,12 @@ function Final({ cat, path, name, onHome }) {
             {h.label && <span style={{ fontSize: 10, color: 'var(--tx3)', background: 'var(--bg3)', border: '0.5px solid var(--bo)', borderRadius: 100, padding: '2px 10px', display: 'inline-block' }}>"{h.label}"</span>}
           </div>
         ))}
+        {llmQuestions.map((q, i) => (
+          <div key={`llm-${i}`} style={{ borderLeft: `1.5px solid ${cat.col}55`, paddingLeft: 13, paddingBottom: i < llmQuestions.length - 1 ? 16 : 0, marginLeft: 4, marginTop: 16 }}>
+            <div style={{ fontSize: 10, color: 'var(--tx3)', marginBottom: 3, letterSpacing: '.08em' }}>BEYOND THE MAP · {i + 1}</div>
+            <p style={{ fontFamily: "'Playfair Display',serif", fontStyle: 'italic', fontSize: i === llmQuestions.length - 1 ? 14 : 12, color: i === llmQuestions.length - 1 ? 'var(--tx)' : 'var(--tx2)', lineHeight: 1.6 }}>{q}</p>
+          </div>
+        ))}
       </div>
       <div style={{ animation: 'up .4s ease .16s both', display: 'flex', flexDirection: 'column', gap: 8 }}>
         <p style={{ fontSize: 10, color: 'var(--tx3)', letterSpacing: '.1em', marginBottom: 3 }}>SEND TO YOUR FRIEND</p>
@@ -428,6 +529,14 @@ function Final({ cat, path, name, onHome }) {
             <span style={{ fontSize: 12, color: copied === t ? '#6bcf8a' : 'var(--ac)', minWidth: 52, textAlign: 'right', fontWeight: 500 }}>{copied === t ? '✓ copied' : '→'}</span>
           </button>
         ))}
+        <button onClick={onViewTree} className="copy-btn"
+          style={{ background: 'var(--bg2)', border: '0.5px solid var(--bo)', borderRadius: 14, padding: '13px 15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', transition: 'border-color .15s' }}>
+          <div style={{ textAlign: 'left' }}>
+            <div style={{ fontSize: 13, color: 'var(--tx)', fontWeight: 500, marginBottom: 2 }}>See your path</div>
+            <div style={{ fontSize: 11, color: 'var(--tx3)' }}>Visualise where you went</div>
+          </div>
+          <span style={{ fontSize: 12, color: 'var(--ac)', minWidth: 52, textAlign: 'right', fontWeight: 500 }}>→</span>
+        </button>
         <button onClick={onHome} style={{ background: 'none', border: 'none', color: 'var(--tx3)', fontSize: 11, padding: '13px', cursor: 'pointer', letterSpacing: '.08em', textAlign: 'center', marginTop: 4 }}>START OVER</button>
       </div>
     </div>
@@ -508,11 +617,26 @@ function Review({ cat, path, senderName, onStartSame, onCategories }) {
   );
 }
 
-/* ── ReplyView (sender sees receiver's answer) ── */
+/* ── ReplyView (sender sees receiver's answer + bridge question) ── */
 function ReplyView({ cat, path, senderName, replyText, onHome }) {
   const hist = getHist(cat, path);
   const last = hist[hist.length - 1];
   const sender = senderName || 'Someone';
+  const [bridgeQ, setBridgeQ] = useState(null);
+  const [loadingBridge, setLoadingBridge] = useState(true);
+  const ran = useRef(false);
+
+  useEffect(() => {
+    if (ran.current) return;
+    ran.current = true;
+    const pathSummary = hist.slice(0, -1).map(h => `- ${h.q}\n  They chose: "${h.label}"`).join('\n');
+    const sys = `You are a facilitator of deep conversations between two people.\nYou write single questions that are intimate, precise, and impossible to answer superficially. Never use "it" or "that" as vague pronouns.\nRespond with ONLY the question. No preamble, no explanation, no quotes.`;
+    const usr = `Two people played Deep Dive on the theme of ${cat.name}.\n\nPerson A's path:\n${pathSummary}\n\nThe question Person A left:\n${last.q}\n\nPerson B answered:\n${replyText}\n\nWrite one question that could only be asked to these two specific people, given what both of them revealed. The question should create a conversation between them, not just ask one person something. Make it specific to what they actually said, not generic philosophical territory.`;
+    callClaude(sys, usr, 150)
+      .then(q => setBridgeQ(q))
+      .catch(() => {})
+      .finally(() => setLoadingBridge(false));
+  }, []);
 
   return (
     <div className="lay" style={{ padding: 'max(64px,10vh) 24px max(48px,8vh)', animation: 'fi .32s ease both' }}>
@@ -525,14 +649,205 @@ function ReplyView({ cat, path, senderName, replyText, onHome }) {
         <p style={{ fontFamily: "'Playfair Display',serif", fontStyle: 'italic', fontSize: 'clamp(16px,4.5vw,20px)', color: 'var(--tx2)', lineHeight: 1.72 }}>{last.q}</p>
       </div>
       <div style={{ width: '100%', height: 1, background: 'var(--bo)', marginBottom: 28 }} />
-      <div style={{ marginBottom: 40, animation: 'up .5s ease .25s both' }}>
+      <div style={{ marginBottom: 36, animation: 'up .5s ease .25s both' }}>
         <div style={{ fontSize: 10, color: 'var(--tx3)', letterSpacing: '.1em', marginBottom: 10 }}>THEY SAID</div>
         <p style={{ fontSize: 16, color: 'var(--tx)', lineHeight: 1.75, fontStyle: 'italic' }}>{replyText}</p>
       </div>
-      <button onClick={onHome} style={{ background: 'var(--bg2)', border: '0.5px solid var(--bo)', borderRadius: 14, padding: '16px', fontSize: 14, color: 'var(--tx)', cursor: 'pointer', width: '100%', animation: 'up .5s ease .35s both' }}>
+      {/* Bridge question */}
+      <div style={{ animation: 'up .5s ease .35s both', marginBottom: 36 }}>
+        <div style={{ width: '100%', height: 1, background: 'var(--bo)', marginBottom: 28 }} />
+        {loadingBridge ? (
+          <div className="bridge-loading">
+            <div className="bridge-pulse" />
+            <span style={{ fontSize: 11, color: 'var(--tx3)', letterSpacing: '.1em' }}>Generating your bridge question...</span>
+          </div>
+        ) : bridgeQ ? (
+          <div>
+            <div style={{ fontSize: 10, color: 'var(--tx3)', letterSpacing: '.1em', marginBottom: 14 }}>ONE QUESTION FOR BOTH OF YOU</div>
+            <p style={{ fontFamily: "'Playfair Display',serif", fontStyle: 'italic', fontSize: 'clamp(18px,5vw,24px)', color: 'var(--tx)', lineHeight: 1.8 }}>{bridgeQ}</p>
+          </div>
+        ) : null}
+      </div>
+      <button onClick={onHome} style={{ background: 'var(--bg2)', border: '0.5px solid var(--bo)', borderRadius: 14, padding: '16px', fontSize: 14, color: 'var(--tx)', cursor: 'pointer', width: '100%', animation: 'up .5s ease .45s both' }}>
         Play another round →
       </button>
     </div>
+  );
+}
+
+/* ── TreeView (decision tree visualisation) ── */
+function TreeView({ cat, path, llmQuestions, onBack }) {
+  const hist = getHist(cat, path);
+  const SVG_W = 300;
+  const V_GAP = 86;
+  const H_GAP = 88;
+  const NR = 11;
+  // x positions for 3 branch nodes, centred in SVG_W
+  const cx = [SVG_W / 2 - H_GAP, SVG_W / 2, SVG_W / 2 + H_GAP];
+  const ry = row => 28 + row * V_GAP;
+
+  // Get branch label at a given depth and branch index
+  const getBranchLabel = (depth, brIdx) => {
+    let n = cat.root;
+    for (let i = 0; i < depth; i++) {
+      if (!n.br || !n.br[path[i]]) break;
+      n = n.br[path[i]];
+    }
+    if (!n.br || !n.br[brIdx]) return '';
+    const label = n.br[brIdx].label || '';
+    return label.length > 14 ? label.slice(0, 14) + '…' : label;
+  };
+
+  // Total SVG rows: root(0) + path.length branch levels + 1 final + llmQuestions.length
+  const totalRows = 1 + path.length + 1 + llmQuestions.length;
+  const SVG_H = ry(totalRows) + 20;
+
+  const branchLabelsPath = hist.slice(0, -1).map(h => h.label);
+
+  return (
+    <div className="lay" style={{ background: '#000', padding: 'max(56px,8vh) 0 48px', overflowY: 'auto' }}>
+      <button onClick={onBack} style={{ position: 'fixed', top: 20, left: 20, background: 'none', border: 'none', color: 'var(--tx3)', fontSize: 20, cursor: 'pointer', padding: 8, zIndex: 10 }}>←</button>
+      <div style={{ textAlign: 'center', marginBottom: 24 }}>
+        <div style={{ fontSize: 10, color: 'var(--tx3)', letterSpacing: '.12em' }}>YOUR PATH</div>
+      </div>
+
+      <svg width={SVG_W} height={SVG_H} style={{ display: 'block', margin: '0 auto', overflow: 'visible' }}>
+        {/* Lines from root to level-1 branches */}
+        {path.length > 0 && [0, 1, 2].map(bi => (
+          <line key={`root-line-${bi}`}
+            x1={SVG_W / 2} y1={ry(0) + NR}
+            x2={cx[bi]} y2={ry(1) - NR}
+            stroke={bi === path[0] ? cat.col : '#2a2a2a'}
+            strokeWidth={bi === path[0] ? 2 : 0.5}
+            opacity={bi === path[0] ? 0.85 : 0.3}
+          />
+        ))}
+
+        {/* Lines between branch levels */}
+        {Array.from({ length: path.length - 1 }).map((_, i) => (
+          [0, 1, 2].map(bi => (
+            <line key={`level-line-${i}-${bi}`}
+              x1={cx[path[i]]} y1={ry(i + 1) + NR}
+              x2={cx[bi]} y2={ry(i + 2) - NR}
+              stroke={bi === path[i + 1] ? cat.col : '#2a2a2a'}
+              strokeWidth={bi === path[i + 1] ? 2 : 0.5}
+              opacity={bi === path[i + 1] ? 0.85 : 0.3}
+            />
+          ))
+        ))}
+
+        {/* Line from last chosen branch to final node */}
+        {path.length > 0 && (
+          <line
+            x1={cx[path[path.length - 1]]} y1={ry(path.length) + NR}
+            x2={SVG_W / 2} y2={ry(path.length + 1) - NR}
+            stroke={cat.col} strokeWidth={2} opacity={0.85}
+          />
+        )}
+
+        {/* LLM node lines */}
+        {llmQuestions.map((_, i) => (
+          <line key={`llm-line-${i}`}
+            x1={SVG_W / 2} y1={ry(path.length + 1 + i) + NR}
+            x2={SVG_W / 2} y2={ry(path.length + 2 + i) - NR}
+            stroke={cat.col} strokeWidth={1.5} opacity={0.45} strokeDasharray="4 4"
+          />
+        ))}
+
+        {/* Root node */}
+        <circle cx={SVG_W / 2} cy={ry(0)} r={NR} fill={cat.col} opacity={0.9} />
+        <text x={SVG_W / 2} y={ry(0) + NR + 13} textAnchor="middle" fill={`${cat.col}88`} fontSize={9} letterSpacing={0.8} fontFamily="DM Sans, sans-serif">
+          {cat.name.toUpperCase()}
+        </text>
+
+        {/* Branch level nodes */}
+        {Array.from({ length: path.length }).map((_, level) => (
+          <g key={`level-${level}`}>
+            {[0, 1, 2].map(bi => {
+              const isChosen = bi === path[level];
+              const label = getBranchLabel(level, bi);
+              return (
+                <g key={bi}>
+                  <circle
+                    cx={cx[bi]} cy={ry(level + 1)} r={NR}
+                    fill={isChosen ? cat.col : '#111'}
+                    stroke={isChosen ? cat.col : '#333'}
+                    strokeWidth={isChosen ? 0 : 0.5}
+                    opacity={isChosen ? 0.9 : 0.22}
+                  />
+                  {isChosen && (
+                    <text x={cx[bi]} y={ry(level + 1) + NR + 13} textAnchor="middle" fill={`${cat.col}77`} fontSize={8} fontFamily="DM Sans, sans-serif">
+                      {label}
+                    </text>
+                  )}
+                </g>
+              );
+            })}
+          </g>
+        ))}
+
+        {/* Final node — pulsing */}
+        <circle cx={SVG_W / 2} cy={ry(path.length + 1)} r={NR} fill={cat.col} opacity={0.9}>
+          <animate attributeName="opacity" values="0.9;0.35;0.9" dur="2.2s" repeatCount="indefinite" />
+        </circle>
+        <text x={SVG_W / 2} y={ry(path.length + 1) + NR + 13} textAnchor="middle" fill={`${cat.col}77`} fontSize={8} letterSpacing={0.5} fontFamily="DM Sans, sans-serif">
+          FINAL
+        </text>
+
+        {/* LLM nodes — rounded rect style */}
+        {llmQuestions.map((_, i) => (
+          <g key={`llm-${i}`}>
+            <rect
+              x={SVG_W / 2 - NR} y={ry(path.length + 2 + i) - NR}
+              width={NR * 2} height={NR * 2} rx={6}
+              fill={cat.col} opacity={0.5}
+            />
+            <text x={SVG_W / 2} y={ry(path.length + 2 + i) + NR + 13} textAnchor="middle" fill={`${cat.col}66`} fontSize={8} fontFamily="DM Sans, sans-serif">
+              +{i + 1}
+            </text>
+          </g>
+        ))}
+      </svg>
+
+      {/* Stats panel */}
+      <div style={{ margin: '28px 22px 0', background: 'var(--bg2)', border: '0.5px solid var(--bo)', borderRadius: 14, padding: '18px 16px' }}>
+        {[
+          ['DEPTH REACHED', `${path.length + llmQuestions.length} levels`],
+          ['THEME', cat.name],
+          ['PATH', branchLabelsPath.join(' → ') || '—'],
+        ].map(([k, v]) => (
+          <div key={k} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginBottom: 12 }}>
+            <span style={{ fontSize: 10, color: 'var(--tx3)', letterSpacing: '.1em', flexShrink: 0, paddingTop: 2 }}>{k}</span>
+            <span style={{ fontSize: 12, color: 'var(--tx2)', textAlign: 'right', lineHeight: 1.5 }}>{v}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Copy path text */}
+      <div style={{ margin: '10px 22px 0' }}>
+        <CopyPathButton cat={cat} path={path} llmQuestions={llmQuestions} hist={hist} />
+      </div>
+    </div>
+  );
+}
+
+function CopyPathButton({ cat, path, llmQuestions, hist }) {
+  const [copied, setCopied] = useState(false);
+
+  const copy = async () => {
+    const labels = hist.slice(0, -1).map(h => h.label).join(' → ');
+    const text = `Deep Dive · ${cat.name}\nPath: ${labels}${llmQuestions.length ? ` + ${llmQuestions.length} beyond the map` : ''}\nDepth: ${path.length + llmQuestions.length} levels`;
+    try { await navigator.clipboard.writeText(text); }
+    catch { const ta = Object.assign(document.createElement('textarea'), { value: text, style: 'position:fixed;opacity:0' }); document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2400);
+  };
+
+  return (
+    <button onClick={copy} className="copy-btn"
+      style={{ width: '100%', background: 'var(--bg2)', border: '0.5px solid var(--bo)', borderRadius: 14, padding: '14px 16px', color: copied ? '#6bcf8a' : 'var(--tx2)', fontSize: 12, letterSpacing: '.08em', cursor: 'pointer', transition: 'color .2s' }}>
+      {copied ? '✓ PATH COPIED' : 'COPY PATH TEXT →'}
+    </button>
   );
 }
 
